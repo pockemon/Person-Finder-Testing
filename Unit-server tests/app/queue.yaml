@@ -1,0 +1,12 @@
+queue:
+# Throttle mail according to quota, see
+# https://cloud.google.com/appengine/quotas?csw=1#Mail
+- name: send-mail
+  rate: 5/s
+# expiry query for ScanExpired tasks
+- name: expiry
+  rate: 5/m
+- name: datachecks
+  rate: 5/m
+- name: prepare-thumbnails
+  rate: 5/m

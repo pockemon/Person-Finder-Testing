@@ -1,0 +1,53 @@
+sudo: required
+
+language: python
+
+matrix:
+  include:
+  # As of 2019-03-15, App Engine's Python 2.7 runtime uses 2.7.12.
+  - name: "Python 2.7.12 tests"
+    python: 2.7.12
+  # To be safe if/when App Engine upgrades, also run tests on a recent version
+  # of Python 2.7.
+  - name: "Python 2.7.recent tests"
+    python: 2.7
+    dist: xenial
+  - name: "Python 3 tests"
+    python: 3.7
+    # The default is currently Trusty, which doesn't have Python 3.7 available.
+    dist: xenial
+
+install:
+  - |
+    sudo apt-get install -y \
+      build-essential \
+      curl \
+      gettext \
+      git \
+      time \
+      unzip
+  # The default version of pip will try to install the latest version of Django
+  # (apparently as part of installing django_csp), which doesn't work because
+  # the latest version of Django requires Python 3.
+  - python -m pip install --upgrade pip setuptools
+  - wget https://storage.googleapis.com/appengine-sdks/featured/google_appengine_1.9.83.zip -O /tmp/appengine.zip
+  - unzip -qq /tmp/appengine.zip
+  - |
+    pip install \
+      cssselect \
+      flake8 \
+      lxml \
+      mock \
+      modernize \
+      parameterized \
+      pillow==4.1.0 \
+      pylint==1.9.4 \
+      pytest
+  - pip install -r requirements.txt -t app/vendors
+  - npm --prefix ui install
+
+before_script:
+  - export APPENGINE_DIR=google_appengine
+
+script:
+  - tools/travis_tests
