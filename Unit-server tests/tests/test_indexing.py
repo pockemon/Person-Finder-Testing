@@ -1,21 +1,4 @@
-# encoding=utf-8
-# Copyright 2019 Google Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Unittest for indexing.py module."""
-
-__author__ = 'eyalf@google.com (Eyal Fink)'
 
 from google.appengine.ext import db
 import datetime
@@ -32,7 +15,6 @@ def create_person(given_name, family_name):
         'test', given_name=given_name, family_name=family_name,
         full_name=('%s %s' % (given_name, family_name)),
         entry_date=datetime.datetime.utcnow())
-
 
 class IndexingTests(unittest.TestCase):
     def setUp(self):
@@ -71,7 +53,6 @@ class IndexingTests(unittest.TestCase):
         sorted = indexing.rank_and_order(res, TextQuery('abc Bryan'), 100)
         assert ['%s %s'%(p.given_name, p.family_name) for p in sorted] == \
             ['abc Bryan', 'Bryan abc', 'Bryan abc efg', 'Bryan abcef']
-
 
         res= [create_person(given_name='abc', family_name='efg'),
               create_person(given_name='ABC', family_name='EFG'),
@@ -119,32 +100,6 @@ class IndexingTests(unittest.TestCase):
             (YU + MING, BEI),  # then nothing match
         ]
 
-    def test_cjk_ranking_2(self):
-        # This is Steven Chu's Chinese name.  His family name is ZHU and his
-        # given name is DI + WEN; the usual Chinese order is ZHU + DI + WEN.
-        ZHU, DI, WEN = u'\u6731', u'\u68e3', u'\u6587'
-
-        # A test database of 3 records with various permutations of the name.
-        persons = [
-            create_person(given_name=WEN, family_name=ZHU + DI),
-            create_person(given_name=DI + WEN, family_name=ZHU),
-            create_person(given_name=ZHU, family_name=DI + WEN),
-        ]
-
-        # When the search query is ZHU + DI + WEN:
-        assert self.get_ranked(persons, ZHU + DI + WEN) == [
-            (DI + WEN, ZHU),  # best: treat query as 1-char surname + given name
-            (WEN, ZHU + DI),  # then: treat as multi-char surname + given name
-            (ZHU, DI + WEN),  # then: treat query as given name + surname
-        ]
-
-        # When the search query is ZHU + ' ' + DI + WEN (no multi-char surname):
-        assert self.get_ranked(persons, ZHU + ' ' + DI + WEN) == [
-            (DI + WEN, ZHU),  # best: treat query as surname + ' ' + given name
-            (ZHU, DI + WEN),  # then: treat query as given name + ' ' + surname
-            (WEN, ZHU + DI),  # then: match query characters out of order
-        ]
-
     def test_sort_query_words(self):
         # Sorted lexicographically.
         assert indexing.sort_query_words(
@@ -159,97 +114,9 @@ class IndexingTests(unittest.TestCase):
         assert indexing.sort_query_words(
             ['CCC', 'BB', 'AA', 'A']) == ['CCC', 'AA', 'BB', 'A']
 
-    def test_search(self):
-        persons = [create_person(given_name='Bryan', family_name='abc'),
-                   create_person(given_name='Bryan', family_name='abcef'),
-                   create_person(given_name='abc', family_name='Bryan'),
-                   create_person(given_name='Bryan abc', family_name='efg'),
-                   create_person(given_name='AAAA BBBB', family_name='CCC DDD')]
-        for p in persons:
-            indexing.update_index_properties(p)
-            db.put(p)
-
-        res = indexing.search('test', TextQuery('Bryan abc'), 1)
-        assert [(p.given_name, p.family_name) for p in res] == [('Bryan', 'abc')]
-
-        res = indexing.search('test', TextQuery('CC AAAA'), 100)
-        assert [(p.given_name, p.family_name) for p in res] == \
-            [('AAAA BBBB', 'CCC DDD')]
-
-    def test_cjk_first_only(self):
-        self.add_persons(
-            create_person(given_name=u'\u4f59\u5609\u5e73', family_name='foo'),
-            create_person(given_name=u'\u80e1\u6d9b\u5e73', family_name='foo'),
-        )
-
-        # Any single character should give a hit.
-        assert self.get_matches(u'\u4f59') == [(u'\u4f59\u5609\u5e73', 'foo')]
-        assert self.get_matches(u'\u5609') == [(u'\u4f59\u5609\u5e73', 'foo')]
-        assert self.get_matches(u'\u5e73') == [
-            (u'\u4f59\u5609\u5e73', 'foo'),
-            (u'\u80e1\u6d9b\u5e73', 'foo')
-        ]
-
-        # Order of characters in the query should not matter.
-        assert self.get_matches(u'\u5609\u5e73') == \
-            [(u'\u4f59\u5609\u5e73', 'foo')]
-        assert self.get_matches(u'\u5e73\u5609') == \
-            [(u'\u4f59\u5609\u5e73', 'foo')]
-        assert self.get_matches(u'\u4f59\u5609\u5e73') == \
-            [(u'\u4f59\u5609\u5e73', 'foo')]
-
-    def test_cjk_last_only(self):
-        self.add_persons(
-            create_person(given_name='foo', family_name=u'\u4f59\u5609\u5e73'),
-            create_person(given_name='foo', family_name=u'\u80e1\u6d9b\u5e73'),
-        )
-
-        # Any single character should give a hit.
-        assert self.get_matches(u'\u4f59') == \
-            [('foo', u'\u4f59\u5609\u5e73')]
-        assert self.get_matches(u'\u5609') == \
-            [('foo', u'\u4f59\u5609\u5e73')]
-        assert self.get_matches(u'\u5e73') == [
-            ('foo', u'\u4f59\u5609\u5e73'),
-            ('foo', u'\u80e1\u6d9b\u5e73')
-        ]
-
-        # Order of characters in the query should not matter.
-        assert self.get_matches(u'\u5609\u5e73') == \
-            [('foo', u'\u4f59\u5609\u5e73')]
-        assert self.get_matches(u'\u5e73\u5609') == \
-            [('foo', u'\u4f59\u5609\u5e73')]
-        assert self.get_matches(u'\u4f59\u5609\u5e73') == \
-            [('foo', u'\u4f59\u5609\u5e73')]
-
-    def test_cjk_first_last(self):
-        self.add_persons(
-            create_person(given_name=u'\u5609\u5e73', family_name=u'\u4f59'),
-            create_person(given_name=u'\u6d9b\u5e73', family_name=u'\u80e1'),
-        )
-
-        # Any single character should give a hit.
-        assert self.get_matches(u'\u4f59') == \
-            [(u'\u5609\u5e73', u'\u4f59')]
-        assert self.get_matches(u'\u5609') == \
-            [(u'\u5609\u5e73', u'\u4f59')]
-        assert self.get_matches(u'\u5e73') == [
-            (u'\u5609\u5e73', u'\u4f59'),
-            (u'\u6d9b\u5e73', u'\u80e1')
-        ]
-
-        # Order of characters in the query should not matter.
-        assert self.get_matches(u'\u5609\u5e73') == \
-            [(u'\u5609\u5e73', u'\u4f59')]
-        assert self.get_matches(u'\u5e73\u5609') == \
-            [(u'\u5609\u5e73', u'\u4f59')]
-        assert self.get_matches(u'\u4f59\u5609\u5e73') == \
-            [(u'\u5609\u5e73', u'\u4f59')]
-
     def test_no_query_terms(self):
         # Regression test (this used to throw an exception).
         assert indexing.search('test', TextQuery(''), 100) == []
-
 
 if __name__ == '__main__':
     logging.basicConfig( stream=sys.stderr )

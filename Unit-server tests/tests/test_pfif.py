@@ -1,19 +1,3 @@
-# Copyright 2010 Google Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS=" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-__author__ = 'kpy@google.com (Ka-Ping Yee) and many other Googlers'
-
 import StringIO
 import difflib
 import importer
@@ -892,42 +876,6 @@ class PfifTests(unittest.TestCase):
                 ':\n' + pprint_diff(test_case.person_records, person_records))
             assert note_records == test_case.note_records, (test_name +
                 ':\n' + pprint_diff(test_case.note_records, note_records))
-
-    def test_write_file(self):
-        """Tests writing of XML files for each test case."""
-        for test_name, test_case in TEST_CASES:
-            if not test_case.do_write_test:
-                continue
-
-            file = StringIO.StringIO()
-            pfif_version = pfif.PFIF_VERSIONS[test_case.pfif_version]
-
-            # Start with fake entities so we can test entity-to-dict conversion.
-            person_entities = map(dict_to_entity, test_case.person_records)
-            note_entities = map(dict_to_entity, test_case.note_records)
-
-            # Convert to dicts and write the records.
-            person_records = [
-                pfif_version.person_to_dict(person, test_case.is_expired)
-                for person in person_entities
-            ]
-            note_records = [
-                pfif_version.note_to_dict(note)
-                for note in note_entities
-            ]
-
-            def get_notes_for_person(person):
-                return [
-                    note for note, raw
-                    # We need the original test_case.note_records since
-                    # note_to_dict clears person_record_id in PFIF 1.1.
-                    in zip(note_records, test_case.note_records)
-                    if raw['person_record_id'] == person['person_record_id']
-                ]
-
-            pfif_version.write_file(file, person_records, get_notes_for_person)
-            assert file.getvalue() == test_case.xml, (
-                test_name + ': ' + text_diff(test_case.xml, file.getvalue()))
 
 
 if __name__ == '__main__':

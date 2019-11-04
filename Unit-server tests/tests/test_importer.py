@@ -1,17 +1,3 @@
-# Copyright 2010 Google Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Tests for importer.py."""
 
 import datetime
@@ -22,7 +8,6 @@ from pytest import raises
 
 import model
 import importer
-
 
 TEST_DATETIME = datetime.datetime(2010, 1, 1, 0, 0, 0)
 
@@ -71,13 +56,6 @@ class ImporterTests(unittest.TestCase):
         raises(ValueError, importer.validate_datetime, '2010-02-28 01:23:45')
         raises(ValueError, importer.validate_datetime, '2010-02-28 01:23:45Z')
         raises(ValueError, importer.validate_datetime, '2010-02-28 1:23:45')
-
-        # Invalid format
-        raises(ValueError, importer.validate_datetime, '2010-02-28T1:23:45Z')
-        # Invalid date
-        raises(ValueError, importer.validate_datetime, '2010-02-29T01:23:45Z')
-        # Invalid time
-        raises(ValueError, importer.validate_datetime, '2010-01-01T25:00:00Z')
 
     def test_validate_boolean(self):
         assert importer.validate_boolean('true')
@@ -267,196 +245,6 @@ class ImporterTests(unittest.TestCase):
         # Confirm all records are NOT marked reviewed.
         for note in model.Note.all():
             assert note.reviewed == False
-
-    def test_authorize_write_believed_dead_note_records(self):
-        # Prepare person records which the notes will be added to.
-        for i in range(20):
-            put_dummy_person_record('haiti', 'test_domain/person_%d' % i)
-
-        # Prepare input data
-        records = []
-        for i in range(20):
-            source_date = '2010-01-01T01:23:45Z'
-            note_id = 'test_domain/record_%d' % i
-            person_id = 'test_domain/person_%d' % i
-            status = 'believed_missing'
-
-            # Records 0, 8, and 16 have status 'believed_dead'.
-            if not i % 8:
-                status = 'believed_dead'
-           
-            records.append({'person_record_id': person_id,
-                            'note_record_id': note_id,
-                            'source_date': source_date,
-                            'status': status})
- 
-        # Disallow import notes with status 'believed_dead'.        
-        written, skipped, total = importer.import_records(
-            'haiti', 'test_domain', importer.create_note, records, False,
-            False, None)
-
-        assert written == 17
-        assert len(skipped) == 3
-        assert skipped[0] == (
-            'Not authorized to post notes with the status'
-            ' \"believed_dead\"', {
-                'person_record_id': 'test_domain/person_0',
-                'source_date': '2010-01-01T01:23:45Z',
-                'note_record_id': 'test_domain/record_0',
-                'status': 'believed_dead'
-            })
-        assert skipped[1] == (
-            'Not authorized to post notes with the status'
-            ' \"believed_dead\"', {
-                'person_record_id': 'test_domain/person_8',
-                'source_date': '2010-01-01T01:23:45Z',
-                'note_record_id': 'test_domain/record_8',
-                'status': 'believed_dead'
-            })
-        assert skipped[2] == (
-            'Not authorized to post notes with the status'
-            ' \"believed_dead\"', {
-                'person_record_id': 'test_domain/person_16',
-                'source_date': '2010-01-01T01:23:45Z',
-                'note_record_id': 'test_domain/record_16',
-                'status': 'believed_dead'
-            })
-
-        assert total == 20
-        assert model.Note.all().count() == 17
-
-        # Allow import notes with status 'believed_dead'.
-        model.Note.all().get().delete()
-        written, skipped, total = importer.import_records(
-            'haiti', 'test_domain', importer.create_note, records, False,
-            True, None)
-
-        assert written == 20
-        assert len(skipped) == 0
-        assert model.Note.all().count() == 20
-
-        for note in model.Note.all():
-            if note.person_record_id in ['test_domain/person_0',
-                                         'test_domain/person_8',
-                                         'test_domain/person_16']:
-                assert note.status == 'believed_dead'
-            else:
-                assert note.status == 'believed_missing' 
-
-    def test_import_reviewed_note_records(self):
-        # Prepare person records which the notes will be added to.
-        for i in range(3):
-            put_dummy_person_record('haiti', 'test_domain/person_%d' % i)
-
-        records = []
-        for i in range(3):
-            source_date = '2010-01-01T01:23:45Z'
-            note_id = 'test_domain/record_%d' % i
-            person_id = 'test_domain/person_%d' % i
-            records.append({'person_record_id': person_id,
-                            'note_record_id': note_id,
-                            'source_date': source_date})
-
-        # Import reviewed notes.
-        written, skipped, total = importer.import_records(
-            'haiti', 'test_domain', importer.create_note, records, True,
-            True, None)
-
-        assert written == 3
-        assert len(skipped) == 0
-        assert total == 3
-        # Confirm all records are marked reviewed.
-        for note in model.Note.all():
-            assert note.reviewed == True
-
-    def test_import_notes_disabled_note_records(self):
-        '''Check that notes will be rejected from API import when 
-        notes_disabled is set to be True by the record author.'''
-        records = []
-        # First prepare and import two person records
-        for i in range(2):
-            given_name = "given_name_%d" % i
-            family_name = "family_name_%d" % i
-
-            source_date = "2010-01-01T01:23:45Z"
-            record_id = "test_domain/person_%d" % i
-
-            author_name = "test_author"
-            author_email = "test_email"
-
-            records.append({'given_name': given_name,
-                            'family_name': family_name,
-                            'person_record_id': record_id,
-                            'source_date': source_date,
-                            'author_name': author_name,
-                            'author_email': author_email})
-        written, skipped, total = importer.import_records(
-            'haiti', 'test_domain', importer.create_person, records, False,
-            True, None)
-
-        assert written == 2
-        assert len(skipped) == 0
-        assert total == 2
-        assert model.Person.all().count() == 2
-
-        # Disable comments for first person record
-        person = model.Person.get('haiti', 'test_domain/person_0')
-        assert person
-        person.notes_disabled = True
-        db.put([person])
-
-        for person in model.Person.all():
-            if person.person_record_id == 'test_domain/person_0':
-                assert person.notes_disabled == True                
-
-        # Import notes
-        records = []
-        for i in range(2):
-            source_date = '2010-01-01T01:23:45Z'
-            note_id = 'test_domain/record_%d' % i
-            person_id = 'test_domain/person_%d' % i
-            records.append({'person_record_id': person_id,
-                            'note_record_id': note_id,
-                            'source_date': source_date})
-        written, skipped, total = importer.import_records(
-            'haiti', 'test_domain', importer.create_note, records, False,
-            True, None)
-
-        # Check that the note associted with first person record is skipped.
-        assert written == 1
-        assert len(skipped) == 1
-        assert skipped[0] == (
-            'The author has disabled new commenting on this record',
-            {
-                'person_record_id': 'test_domain/person_0',
-                'source_date': '2010-01-01T01:23:45Z',
-                'note_record_id': 'test_domain/record_0',
-            })
-
-        assert total == 2
-        assert model.Note.all().count() == 1
-
-    def test_import_note_records_for_non_existent_person(self):
-        records = [{
-            'person_record_id': 'test_domain/non_existent_person',
-            'note_record_id': 'test_domain/record_0',
-            'source_date': '2010-01-01T01:23:45Z',
-        }]
-        written, skipped, total = importer.import_records(
-            'haiti', 'test_domain', importer.create_note, records, False,
-            True, None)
-
-        assert written == 0
-        assert len(skipped) == 1
-        assert skipped[0] == (
-            "There is no person record with the person_record_id "
-            "'test_domain/non_existent_person'", {
-                'person_record_id': 'test_domain/non_existent_person',
-                'source_date': '2010-01-01T01:23:45Z',
-                'note_record_id': 'test_domain/record_0'
-            })
-        assert total == 1
-        assert model.Note.all().count() == 0
 
 if __name__ == "__main__":
     unittest.main()

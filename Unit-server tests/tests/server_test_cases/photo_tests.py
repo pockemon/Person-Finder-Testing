@@ -1,28 +1,9 @@
-# encoding: utf-8
-# Copyright 2010 Google Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Test cases for end-to-end testing.  Run with the server_tests script."""
 
-
-
 import model
-
 from google.appengine.api import images
 from photo import MAX_IMAGE_DIMENSION, MAX_THUMBNAIL_DIMENSION, set_thumbnail
 from server_tests_base import ServerTestsBase
-
 
 class PhotoTests(ServerTestsBase):
     """Tests that verify photo upload and serving."""
@@ -100,33 +81,3 @@ class PhotoTests(ServerTestsBase):
         # Verify an error message is displayed.
         assert not doc.cssselect('img.photo')
         assert 'unrecognized format' in doc.text
-
-    def test_set_thumbnail(self):
-        """Tests that a thumbnail is generated."""
-        with open('tests/testdata/small_image.png') as image_file:
-            photo = model.Photo.create('haiti', image_data=image_file.read())
-        photo.save()
-        self.go('/haiti/tasks/thumbnail_preparer')
-        doc = self.s.go('/haiti/photo?id=%s&thumb=true' %
-                        photo.key().name().split(':')[1])
-        image = images.Image(doc.content_bytes)
-        assert image.format == images.PNG
-        assert image.height == MAX_THUMBNAIL_DIMENSION
-        assert image.width == MAX_THUMBNAIL_DIMENSION
-
-    def test_skip_thumbnail_for_small_enough_images(self):
-        """Tests that a thumbnail isn't generated for small enough images."""
-        with open('tests/testdata/tiny_image.png') as image_file:
-            photo = model.Photo.create('haiti', image_data=image_file.read())
-        photo.save()
-        self.go('/haiti/tasks/thumbnail_preparer')
-        db_photo = model.Photo.get_by_key_name(photo.key().name())
-        # tiny_image.png is 40x40, so it shouldn't bother generating a
-        # thumbnail.
-        assert not db_photo.thumbnail_data
-        doc = self.s.go('/haiti/photo?id=%s&thumb=true' %
-                        photo.key().name().split(':')[1])
-        image = images.Image(doc.content_bytes)
-        assert image.format == images.PNG
-        assert image.height == 40
-        assert image.width == 40
