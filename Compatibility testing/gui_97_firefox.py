@@ -11,7 +11,7 @@ time.sleep(1)
 link_color_rgb = driver.find_element_by_xpath("/html/body/div/div[4]/div[1]/div/div[1]/div[1]/div/div[3]/div[1]/a").value_of_css_property("color")
 
 #the following steps are performed to convert the color coding from rgb format to hex format
-r, g, b, alpha = ast.literal_eval(link_color_rgb.strip("rgba"))
+r, g, b = ast.literal_eval(link_color_rgb.strip("rgb"))
 link_color = '#%02x%02x%02x' % (r, g, b)
 
 spam_link_color_rgb = driver.find_element_by_xpath("/html/body/div/div[4]/div[1]/div/div[1]/div[2]/div/div/div[2]/div[2]/span/a").value_of_css_property("color")
@@ -19,7 +19,7 @@ spam_link_color_rgb = driver.find_element_by_xpath("/html/body/div/div[4]/div[1]
 #print(spam_link_color_rgb)
 
 #the following steps are performed to convert the color coding from rgb format to hex format
-r, g, b, alpha = ast.literal_eval(spam_link_color_rgb.strip("rgba"))
+r, g, b = ast.literal_eval(spam_link_color_rgb.strip("rgb"))
 spam_link_color = '#%02x%02x%02x' % (r, g, b)
 
 #print(error_color)
